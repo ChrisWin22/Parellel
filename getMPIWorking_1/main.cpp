@@ -5,8 +5,7 @@
 
 #define MCW MPI_COMM_WORLD
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
 	int rank, size;
 	int data;
 	MPI_Init(&argc, &argv);
@@ -17,5 +16,8 @@ int main(int argc, char **argv)
 	MPI_Recv(&data, 1, MPI_INT, MPI_ANY_SOURCE, 0, MCW, MPI_STATUS_IGNORE);
 
 	std::cout << "I am "<<rank<<" of "<<size<<"; got message from "<<data<<std::endl;
+
+	MPI_Finalize();
+
 	return 0;
 }
