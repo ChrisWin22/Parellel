@@ -11,28 +11,32 @@
 // rank 0 is the master
 
 void passTo(int rank, int data) {
-    srand(time(NULL));
     int random = rand()%2;
     int nextLevel = data + 1;
 
-    std::cout << "Random number: " << random << std::endl;
 
     if(rank == 7) {
         MPI_Send(&nextLevel, 1, MPI_INT, rank - 1, 0, MCW);
-        std::cout << "Sent from " << rank << " to " << rank - 1 << " on level " << nextLevel << std::endl;
     }
     else if(rank == 1) {
         MPI_Send(&nextLevel, 1, MPI_INT, rank + 1, 0, MCW);
-        std::cout << "Sent from " << rank << " to " << rank + 1 << " on level " << nextLevel << std::endl;
     }
 
-    else if(random == 1) {
-        MPI_Send(&nextLevel, 1, MPI_INT, rank + 1, 0, MCW);
-        std::cout << "Sent from " << rank << " to " << rank + 1 << " on level " << nextLevel << std::endl;
+    else if(random == 1) { // pass to the right
+        if(data % 2 == 0) { // on even row
+            MPI_Send(&nextLevel, 1, MPI_INT, rank + 1, 0, MCW);
+        }
+        else { // on odd row
+            MPI_Send(&nextLevel, 1, MPI_INT, rank, 0, MCW);
+        }
     }
-    else {
-        MPI_Send(&nextLevel, 1, MPI_INT, rank - 1, 0, MCW);
-        std::cout << "Sent from " << rank << " to " << rank - 1 << " on level " << nextLevel << std::endl;
+    else { //pass to left
+        if(data % 2 == 0) { //on even row
+            MPI_Send(&nextLevel, 1, MPI_INT, rank, 0, MCW);
+        }
+        else { // on odd row
+            MPI_Send(&nextLevel, 1, MPI_INT, rank - 1, 0, MCW);
+        }
     }
 }
 
@@ -48,8 +52,9 @@ int main(int argc, char **argv) {
     MPI_Comm_size(MCW, &size);
 
     if(rank == 0) {
+        srand(time(0));
         int numReturned = 0;
-        int numBalls = 1;
+        int numBalls = 1500;
         for(int i = 0; i < numBalls; ++i) {
             MPI_Send(&data, 1, MPI_INT, 4, 0, MCW);
         }
@@ -78,7 +83,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    std::cout << "Terminating column " << rank << " with " << finished << " balls." << std::endl;
+    std::cout << "Row " << rank << " has " << finished << " balls." << std::endl;
 
 
     MPI_Finalize();
