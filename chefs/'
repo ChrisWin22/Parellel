@@ -22,12 +22,14 @@ int main(int argc, char **argv) {
 
         while(true){
             int buf;
+            int killOrder = 1;
             int flag;
             int numOrders = 0;
             while(true) {
                 MPI_Iprobe(MPI_ANY_SOURCE, 1, MCW, &flag, &myStatus);
-                if(flag) {
+                if(flag == 1) {
                     MPI_Recv(&buf, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MCW, MPI_STATUS_IGNORE);
+                    std::cout << "Cook: Received order from " << myStatus.MPI_SOURCE << std::endl;
                     ++numOrders;
                 }
                 else {
@@ -36,9 +38,10 @@ int main(int argc, char **argv) {
             }
             if(numOrders > 20) {
                 std::cout << "Cook: That's too many! I quit!" << std::endl;
-                for(int i = 0; i < size; ++i) {
-                    MPI_Isend(&buf, 1, MPI_INT, i, 0, MCW, &myRequest);
-                }
+                MPI_Bcast(&killOrder, 1, MPI_INT, 0, MCW);
+                //for(int i = 0; i < size; ++i) {
+                //    MPI_Send(&buf, 1, MPI_INT, i, 0, MCW);
+                //}
                 break;
             }
             if(numOrders == 0) {
@@ -46,7 +49,7 @@ int main(int argc, char **argv) {
                 sleep(1);
             }
             else {
-                std::cout << "Cook: I received " << numOrders << " orders" << std::endl;
+                std::cout << "I received " << numOrders << " orders." << std::endl;
                 for(int i = numOrders; i > 0; --i) {
                     sleep(1);
                     std::cout << "Cook: Finished an order. " << i << " remaining." << std::endl;
@@ -57,24 +60,17 @@ int main(int argc, char **argv) {
         }
     }
     else { // Chefs
-        int flag;
+        int flag = 0;
+        MPI_Irecv(&flag, 1, MPI_INT, 0, MPI_ANY_TAG, MCW, &myRequest);
 
-        while(true) {
-            MPI_Iprobe(0, 0, MCW, &flag, &myStatus);
-
-            if(flag) { // Got yelled at
-                std::cout << rank << ": That was rude, I quit!" << std::endl;
-                break;
-            }
-            else { // Give order
-                int order = 1;
-                int timeToWait = (rand() % 5) + 1;
-                sleep(timeToWait);
-                MPI_Isend(&order, 1, MPI_INT, 0, 1, MCW, &myRequest);
-                std::cout << rank << ": Do this" << std::endl;
-            }
-        
+        while(!flag) {
+            int order = 1;
+            int timeToWait = (rand() % 5) + 1;
+            sleep(timeToWait);
+            MPI_Send(&order, 1, MPI_INT, 0, 1, MCW);
+            std::cout << rank << ": Do this" << std::endl;
         }
+        std::cout << rank << ": That was rude, I quit!" << std::endl;
     }
 
 
