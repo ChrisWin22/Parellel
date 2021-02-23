@@ -69,16 +69,6 @@ int main(int argc, char **argv) {
                 }
             }
 
-            //if(destination > rank && !getIthBit(rank, loop + 1)) {
-            //    myNumber = std::min(temp, myNumber);
-            //}
-            //else if(rank > destination && getIthBit(rank, loop + 1)) {
-            //    myNumber = std::min(temp, myNumber);
-            //}
-            //else { 
-            //    myNumber = std::max(temp, myNumber);
-            //}
-            
             MPI_Barrier(MCW);
         }
     }
