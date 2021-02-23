@@ -6,6 +6,10 @@
 
 #define MCW MPI_COMM_WORLD
 
+int getIthBit(int rank, int spot) {
+    return rank & (1 << spot);
+}
+
 int main(int argc, char **argv) {
 	int rank, size;
 	int data;
@@ -26,6 +30,7 @@ int main(int argc, char **argv) {
         std::cout << "================" << std::endl;
         std::cout << "Starting Numbers" << std::endl;
         std::cout << "================" << std::endl;
+        sleep(1);
     }
     MPI_Barrier(MCW);
 
@@ -35,22 +40,47 @@ int main(int argc, char **argv) {
         std::cout << "==================" << std::endl;
         std::cout << "After Sort Numbers" << std::endl;
         std::cout << "==================" << std::endl;
+        sleep(1);
     }
     MPI_Barrier(MCW);
 
     for(int loop = 0; loop < timesToLoop; ++loop) {
-       int destination = rank^(mask<<loop); 
-       std::cout << rank << ": Trading with " << destination << " on loop " << loop << std::endl;
-       MPI_Send(&myNumber, 1, MPI_INT, destination, 0, MCW);
-       MPI_Recv(&temp, 1, MPI_INT, MPI_ANY_SOURCE, 0, MCW, MPI_STATUS_IGNORE);
+        for(int innerLoop = loop; innerLoop >= 0; --innerLoop) {
+            int destination = rank^(mask<<innerLoop); 
+            MPI_Send(&myNumber, 1, MPI_INT, destination, 0, MCW);
+            MPI_Recv(&temp, 1, MPI_INT, MPI_ANY_SOURCE, 0, MCW, MPI_STATUS_IGNORE);
 
-       if(destination > rank) {
-           myNumber = std::min(temp, myNumber);
-       }
-       else {
-           myNumber = std::max(temp, myNumber);
-       }
-       MPI_Barrier(MCW);
+            if(getIthBit(rank, loop+1)){
+                // Desc
+                if(rank > destination) {
+                    myNumber = std::min(temp, myNumber);
+                }
+                else {
+                    myNumber = std::max(temp, myNumber);
+                }
+            }
+            else {
+                // Asc
+                if(rank < destination) {
+                    myNumber = std::min(temp, myNumber);
+                }
+                else {
+                    myNumber = std::max(temp, myNumber);
+                }
+            }
+
+            //if(destination > rank && !getIthBit(rank, loop + 1)) {
+            //    myNumber = std::min(temp, myNumber);
+            //}
+            //else if(rank > destination && getIthBit(rank, loop + 1)) {
+            //    myNumber = std::min(temp, myNumber);
+            //}
+            //else { 
+            //    myNumber = std::max(temp, myNumber);
+            //}
+            
+            MPI_Barrier(MCW);
+        }
     }
 
     std::cout << rank << ": My ending number is " << myNumber << std::endl;
