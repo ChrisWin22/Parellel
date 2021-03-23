@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <math.h>
+#include <algorithm>
+#include <limits.h>
 
 
 #define MCW MPI_COMM_WORLD
@@ -116,17 +118,14 @@ const std::array<city, 100> cities {{
 }};
 
 
-
-
-
-int getDistanceBetweenToPoints(int cityA, int cityB) {
+double getDistanceBetweenToPoints(int cityA, int cityB) {
     city a = cities[cityA];
     city b = cities[cityB];
 
-    return sqrt((a.x - b.x)^2 + (a.y - b.y)^2);
+    return sqrt(pow(a.x - b.x, 2) + pow(a.y - b.y, 2));
 }
 
-double getDistanceOfArray(int path[]) {
+double getDistanceOfArray(std::array<int, 100> path) {
     double total = 0;
     for(int i = 0; i < 99; ++i) {
         total += getDistanceBetweenToPoints(path[i], path[i + 1]);
@@ -162,6 +161,26 @@ int getNumLocation(std::array<int,100> array, int num) {
     return -1;
 }
 
+void mutate(std::array<int,100> &child) {
+    int start = rand() % 100;
+    int end = rand() % 100;
+
+    if(start > end) {
+        int temp = start;
+        start = end;
+        end = temp;
+    }
+
+    while(start < end) {
+        int temp = child[start];
+        child[start] = child[end];
+        child[end] = temp;
+
+        start++;
+        end--;
+    }
+}
+
 std::array<int,100> makeChild(std::array<int, 100> parentA, std::array<int, 100> parentB) {
     std::array<int,100> child = parentA;
 
@@ -186,9 +205,14 @@ std::array<int,100> makeChild(std::array<int, 100> parentA, std::array<int, 100>
         swapNumbersInArray(&child[0], child[p1Local], child[p2Local]);
     }
 
+    mutate(child);
+
     return child;
 }
 
+bool compareDistance(std::array<int, 100> left, std::array<int,100> right) {
+    return (getDistanceOfArray(left) < getDistanceOfArray(right));
+}
 
 int main(int argc, char **argv) {
     int rank;
@@ -200,32 +224,54 @@ int main(int argc, char **argv) {
     srand(rank + time(NULL));
 
     if(rank == 0) {
-        std::array<int, 100> p1;
-        std::array<int,100> p2;
-
-        for(int i = 0; i < 100; ++i) {
-            p1[i] = i;
-            p2[i] = 99 - i;
+        double best = std::numeric_limits<double>::max();
+        double temp;
+        for(int i = 0; i < size - 1; ++i) {                
+            MPI_Recv(&temp, 1, MPI_DOUBLE, MPI_ANY_SOURCE, 0, MCW, MPI_STATUS_IGNORE);
+            if(temp < best) {
+                best = temp;
+            }
         }
-
-        std::cout << "Parent 1: ";
-        for(int i = 0; i < 100; ++i) {
-            std::cout << p1[i] << " ";
-        }
-        std::cout << std::endl;
-        std::cout << "Parent 2: ";
-        for(int i = 0; i < 100; ++i) {
-            std::cout << p2[i] << " ";
-        }
-        std::cout << std::endl;
-        std::cout << "   Child: ";
-        std::array<int, 100> child = makeChild(p1, p2);
-        for(int i = 0; i < 100; ++i) {
-            std::cout << child[i] << " ";
-        }
-        sleep(2);
+        std::cout << "The best distance is: " << best << std::endl;
     }
+    else {
+        std::array<std::array<int, 100>, 10> population;
+        for(int i = 0; i < 10; ++i) {
+            std::array<int, 100> parent;
 
+            for(int j = 0; j < 100; ++j) {
+                parent[j] = j;
+            }
+
+            for(int k = 0; k < 50; ++k) {
+                int num1 = rand() % 100;
+                int num2 = rand() % 100;
+                swapNumbersInArray(&parent[0], num1, num2);
+            }
+            population[i] = parent;
+        }
+
+        for(int j = 0; j < 200000; ++j){
+            std::array<std::array<int, 100>, 20> nextGen;
+            for(int i = 0; i < 20; ++i) {
+                int parentASpot = rand() % 10;
+                int parentBSpot = rand() % 10;
+                while(parentASpot == parentBSpot) {
+                    parentBSpot = rand() % 10;
+                }
+
+                nextGen[i] = makeChild(population[parentASpot], population[parentBSpot]);
+            }
+            std::sort(std::begin(nextGen), std::end(nextGen), compareDistance);
+            for(int i = 0; i < 10; ++i) {
+                population[i] = nextGen[i];
+            }
+        }
+        double bestSolution = getDistanceOfArray(population[0]);
+        std::cout << rank << ": " << bestSolution << std::endl;
+
+        MPI_Send(&bestSolution, 1, MPI_DOUBLE, 0, 0, MCW);
+    }
 
     MPI_Finalize();
 }
